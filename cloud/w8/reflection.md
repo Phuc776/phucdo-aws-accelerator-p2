@@ -198,3 +198,217 @@ Terraform cung cấp một cách tiếp cận khác:
 * Remote State
 * Best Practices cho môi trường production
 * Liên hệ Terraform với các kiến trúc AWS đã triển khai trong Phase 1 (Lambda, API Gateway, EventBridge, CloudWatch, IAM, S3)
+
+---
+
+# Day 2
+
+## Kubernetes Foundation
+
+### Cài đặt môi trường
+
+Đã hoàn tất cài đặt và kiểm tra các công cụ cần thiết để chạy Kubernetes local:
+
+```powershell
+docker version
+kubectl version --client
+minikube version
+```
+
+Đã khởi động thành công cluster local bằng minikube:
+
+```powershell
+minikube start --driver=docker
+kubectl get nodes
+```
+
+Kết quả:
+
+```text
+NAME       STATUS   ROLES           AGE   VERSION
+minikube   Ready    control-plane   9h    v1.35.1
+```
+
+Điều này xác nhận Kubernetes cluster local đã hoạt động bình thường.
+
+---
+
+### Demo Kubernetes Application
+
+Thực hiện deploy một ứng dụng nginx đơn giản bằng file `app.yaml`.
+
+Các Kubernetes object đã được tạo:
+
+```text
+namespace/w8-demo
+configmap/app-config
+secret/app-secret
+deployment.apps/nginx-app
+service/nginx-service
+networkpolicy.networking.k8s.io/allow-nginx-ingress
+```
+
+Kiểm tra các resource:
+
+```powershell
+kubectl get all -n w8-demo
+kubectl get configmap -n w8-demo
+kubectl get secret -n w8-demo
+kubectl get networkpolicy -n w8-demo
+```
+
+Qua đó quan sát được cách Kubernetes tạo và quản lý:
+
+* Namespace
+* Pod
+* Deployment
+* ReplicaSet
+* Service
+* ConfigMap
+* Secret
+* NetworkPolicy
+
+---
+
+## Điều học được
+
+### Pod
+
+Pod là đơn vị deploy nhỏ nhất trong Kubernetes.
+
+Pod mang tính ephemeral (có thể bị tạo lại bất kỳ lúc nào), vì vậy trong thực tế thường không quản lý Pod trực tiếp mà sử dụng Deployment.
+
+---
+
+### Deployment
+
+Deployment mô tả trạng thái mong muốn (desired state) của ứng dụng.
+
+Ví dụ:
+
+```text
+replicas = 2
+image = nginx:alpine
+```
+
+Kubernetes sẽ cố gắng duy trì đúng số lượng Pod mong muốn.
+
+Nếu Pod bị xóa hoặc gặp lỗi, Deployment sẽ tự tạo Pod mới để đưa hệ thống trở về trạng thái mong muốn.
+
+---
+
+### Service
+
+Service cung cấp endpoint ổn định cho ứng dụng.
+
+Do Pod có thể bị tạo lại và thay đổi IP, client không nên truy cập trực tiếp Pod mà nên truy cập thông qua Service.
+
+Service đóng vai trò tương tự cơ chế service discovery hoặc internal load balancer trong hệ thống phân tán.
+
+---
+
+### ConfigMap
+
+ConfigMap dùng để lưu các cấu hình không nhạy cảm.
+
+Ví dụ:
+
+```text
+APP_NAME
+APP_ENV
+LOG_LEVEL
+```
+
+ConfigMap giúp tách cấu hình khỏi container image.
+
+---
+
+### Secret
+
+Secret dùng để lưu các cấu hình nhạy cảm như:
+
+```text
+API_KEY
+TOKEN
+PASSWORD
+```
+
+Qua quá trình tìm hiểu nhận thấy Kubernetes Secret không phải là giải pháp quản lý bí mật hoàn chỉnh. Secret mặc định vẫn được lưu trong etcd và dữ liệu chỉ được encode dưới dạng Base64.
+
+Trong môi trường production thường kết hợp với:
+
+* KMS
+* HashiCorp Vault
+* AWS Secrets Manager
+
+để tăng mức độ bảo mật.
+
+---
+
+### Probe
+
+Probe là cơ chế Kubernetes sử dụng để đánh giá trạng thái của ứng dụng.
+
+Ba loại probe chính:
+
+#### Startup Probe
+
+Kiểm tra ứng dụng đã khởi động hoàn tất hay chưa.
+
+Phù hợp với các ứng dụng có thời gian startup dài.
+
+#### Readiness Probe
+
+Kiểm tra Pod đã sẵn sàng nhận traffic hay chưa.
+
+Nếu readiness fail, Pod vẫn chạy nhưng Service sẽ không route request vào Pod đó.
+
+#### Liveness Probe
+
+Kiểm tra ứng dụng còn hoạt động bình thường hay không.
+
+Nếu liveness fail, Kubernetes sẽ restart Pod.
+
+---
+
+### NetworkPolicy
+
+NetworkPolicy là cơ chế kiểm soát giao tiếp mạng giữa các Pod.
+
+Có thể xem như firewall ở tầng Kubernetes workload.
+
+Khi kết hợp với:
+
+* Namespace
+* Labels
+* NetworkPolicy
+
+sẽ tạo nên cơ chế phân tách và kiểm soát truy cập tương đối giống với việc sử dụng VPC, Security Group và một phần NACL trong AWS.
+
+---
+
+## Liên hệ với Terraform
+
+Một điểm thú vị là cả Terraform và Kubernetes đều hoạt động dựa trên khái niệm Desired State.
+
+Terraform:
+
+```text
+Desired Infrastructure
+↓
+Terraform State
+↓
+Infrastructure thực tế
+```
+
+Kubernetes:
+
+```text
+Desired Workload
+↓
+Deployment
+↓
+Pods thực tế
+```
+
+Cả hai hệ thống đều liên tục so sánh trạng thái hiện tại với trạng thái mong muốn và thực hiện hành động để đưa hệ thống về đúng cấu hình đã khai báo.
