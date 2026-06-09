@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: observability-demo
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: observability-demo
+
+  template:
+    metadata:
+      labels:
+        app: observability-demo
+
+    spec:
+      containers:
+        - name: observability-demo
+
+          image: w9-observability-demo:1.0
+
+          imagePullPolicy: Never
+
+          ports:
+            - containerPort: 8000
